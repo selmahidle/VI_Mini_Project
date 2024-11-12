@@ -7,7 +7,6 @@ Based on theese tutorials: https://www.youtube.com/watch?v=83FLt4fPNGs and https
 import os
 from glob import glob
 from sklearn.model_selection import train_test_split
-import torch
 from monai.transforms import Compose, LoadImaged, ToTensord, EnsureChannelFirstd, Spacingd, ScaleIntensityRanged, CropForegroundd, Resized
 from monai.data import Dataset, DataLoader
 from monai.utils import first
@@ -16,8 +15,7 @@ import matplotlib.pyplot as plt
 
 # TODO: there is also a test folder in IDUN
 
-# For IDUN - set data_dir = "/cluster/projects/vc/data/mic/open/HNTS-MRG/train"
-data_dir = "/Users/selmahidle/Documents/skole/visuell_intelligens/mini_project/data"
+data_dir = "/cluster/projects/vc/data/mic/open/HNTS-MRG/train"
 
 
 """
@@ -27,8 +25,7 @@ preRT image data loading
 preRT_images = sorted(glob(os.path.join(data_dir, '*', 'preRT', '*_T2.nii.gz')))
 preRT_masks = sorted(glob(os.path.join(data_dir, "*", "preRT", "*_mask.nii.gz")))
 
-# TODO: This is a 60/20/20 split because I only have 5 images downloaded, change to 80/10/10 when running on IDUN by setting the first test_size to 0.2 and not 0.4
-X_preRT_train, X_preRT_test_and_val, y_preRT_train, y_preRT_test_and_val = train_test_split(preRT_images, preRT_masks, test_size=0.4, random_state=42)
+X_preRT_train, X_preRT_test_and_val, y_preRT_train, y_preRT_test_and_val = train_test_split(preRT_images, preRT_masks, test_size=0.2, random_state=42)
 X_preRT_test, X_preRT_val, y_preRT_test, y_preRT_val = train_test_split(X_preRT_test_and_val, y_preRT_test_and_val, test_size=0.5, random_state=42)
 
 preRT_train_files = [{"image": preRT_image_filename, "mask": preRT_mask_filename} for preRT_image_filename, preRT_mask_filename in zip(X_preRT_train, y_preRT_train)]
@@ -95,11 +92,17 @@ midRT_val_loader = DataLoader(midRT_val_ds, batch_size = 1)
 preRT_test_loader = DataLoader(preRT_test_ds, batch_size = 1)
 midRT_test_loader = DataLoader(midRT_test_ds, batch_size = 1)
 
+file_path = "/cluster/work/selmahi/output.txt"
+
+with open(file_path, "w") as file:
+    file.write("Klarte å kjøre koden på IDUN")
+
+
 """
 Plot one slice of the first patient
 
 Can be useful for understanding but not needed for preprocessing
-"""
+
 
 test_patient = first(preRT_train_loader)
 plt.figure("Test", (12, 6))
@@ -111,6 +114,4 @@ plt.subplot(1, 2, 2)
 plt.title("Mask of slice 40")
 plt.imshow(test_patient["mask"][0, 0, :, :, 40])
 plt.show()
-
-
-
+"""
