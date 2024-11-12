@@ -63,8 +63,6 @@ train_transforms = Compose(
         EnsureChannelFirstd(keys=["image", "mask"]), # AddChanneld
         Spacingd(keys=["image", "mask"], pixdim=(1.5, 1.5, 2)), # usikker på om dette burde være med
         ScaleIntensityRanged(keys=["image"], a_min=-200, a_max=200, b_min=0.0, b_max=1.0, clip=True),
-        CropForegroundd(keys=["image", "mask"], source_key=["image"]),
-        Resized(keys=["image", "mask"], spatial_size=[128, 128, 128]), # usikker på om 128 er riktig for våre bilder hvertfall høyde, bredde og antall slices
         ToTensord(keys=["image", "mask"])
     ]
 )
@@ -101,7 +99,7 @@ midRT_test_loader = DataLoader(midRT_test_ds, batch_size = 1)
 Plot one slice of the first patient
 
 Can be useful for understanding but not needed for preprocessing
-
+"""
 
 test_patient = first(preRT_train_loader)
 plt.figure("Test", (12, 6))
@@ -113,6 +111,6 @@ plt.subplot(1, 2, 2)
 plt.title("Mask of slice 40")
 plt.imshow(test_patient["mask"][0, 0, :, :, 40])
 plt.show()
-"""
+
 
 
