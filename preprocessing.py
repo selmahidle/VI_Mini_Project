@@ -85,18 +85,12 @@ preRT_test_ds = Dataset(data=preRT_test_files, transform=val_test_transforms)
 midRT_test_ds = Dataset(data=midRT_test_files, transform=val_test_transforms)
 
 # TODO: maybe change the batch size
-preRT_train_loader = DataLoader(preRT_train_ds, batch_size = 1)
-midRT_train_loader = DataLoader(midRT_train_ds, batch_size = 1)
-preRT_val_loader = DataLoader(preRT_val_ds, batch_size = 1)
-midRT_val_loader = DataLoader(midRT_val_ds, batch_size = 1)
-preRT_test_loader = DataLoader(preRT_test_ds, batch_size = 1)
-midRT_test_loader = DataLoader(midRT_test_ds, batch_size = 1)
-
-file_path = "/cluster/work/selmahi/output.txt"
-
-with open(file_path, "w") as file:
-    file.write("Klarte å kjøre koden på IDUN")
-
+preRT_train_loader = DataLoader(preRT_train_ds, batch_size = 32)
+midRT_train_loader = DataLoader(midRT_train_ds, batch_size = 32)
+preRT_val_loader = DataLoader(preRT_val_ds, batch_size = 32)
+midRT_val_loader = DataLoader(midRT_val_ds, batch_size = 32)
+preRT_test_loader = DataLoader(preRT_test_ds, batch_size = 32)
+midRT_test_loader = DataLoader(midRT_test_ds, batch_size = 32)
 
 """
 Plot one slice of the first patient
