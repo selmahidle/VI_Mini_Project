@@ -17,9 +17,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Define the model
 model = UNet(
-    spatial_dims=3,  # 3D data
-    in_channels=1,  # Single channel input (grayscale)
-    out_channels=1,  # Single channel output (binary segmentation)
+    spatial_dims=3,
+    in_channels=1,
+    out_channels=3,  # background and two tumor labels
     channels=(16, 32, 64, 128, 256),
     strides=(2, 2, 2, 2),
     kernel_size=3,
@@ -27,7 +27,7 @@ model = UNet(
 ).to(device)
 
 # Define the loss function and optimizer
-loss_function = DiceLoss(sigmoid=True)
+loss_function = loss_function = DiceLoss(to_onehot_y=False, softmax=True)
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
 # Metrics

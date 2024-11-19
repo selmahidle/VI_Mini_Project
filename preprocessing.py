@@ -73,6 +73,7 @@ Here we convert the multi-classes labels into multi-labels segmentation task in 
 class ConvertToMultiChannelHNTSd(MapTransform):
     """
     Convert HNTS-MRG labels to multi-channel format:
+    - Channel 0: Background (label 0)
     - Channel 1: GTVp (label 1, primary tumor)
     - Channel 2: GTVn (label 2, lymph nodes)
     """
@@ -81,6 +82,7 @@ class ConvertToMultiChannelHNTSd(MapTransform):
         d = dict(data)
         for key in self.keys:
             result = []
+            result.append(d[key] == 0)  # Channel 0: Background
             result.append(d[key] == 1)  # Channel 1: GTVp
             result.append(d[key] == 2)  # Channel 2: GTVn
             d[key] = torch.stack(result, axis=0).float()
@@ -128,9 +130,9 @@ preRT_val_ds = Dataset(data=preRT_val_files, transform=val_test_transforms)
 preRT_test_ds = Dataset(data=preRT_test_files, transform=val_test_transforms)
 #midRT_test_ds = Dataset(data=midRT_test_files, transform=val_test_transforms)
 
-preRT_train_loader = DataLoader(preRT_train_ds, batch_size=4, collate_fn=pad_list_data_collate, num_workers=4)
-preRT_val_loader = DataLoader(preRT_val_ds, batch_size=4, collate_fn=pad_list_data_collate, num_workers=4)
-preRT_test_loader = DataLoader(preRT_test_ds, batch_size=4, collate_fn=pad_list_data_collate, num_workers=4)
+preRT_train_loader = DataLoader(preRT_train_ds, batch_size=4, collate_fn=pad_list_data_collate)
+preRT_val_loader = DataLoader(preRT_val_ds, batch_size=4, collate_fn=pad_list_data_collate)
+preRT_test_loader = DataLoader(preRT_test_ds, batch_size=4, collate_fn=pad_list_data_collate)
 
 
 #midRT_train_loader = DataLoader(midRT_train_ds, batch_size = 32)
