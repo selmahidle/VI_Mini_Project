@@ -21,7 +21,7 @@ from monai.transforms import (
     RandShiftIntensityd,
     RandScaleIntensityd
 )
-from monai.data import Dataset, DataLoader
+from monai.data import Dataset, DataLoader, pad_list_data_collate
 from monai.utils import first
 import matplotlib.pyplot as plt
 import torch
@@ -95,13 +95,13 @@ train_transforms = Compose([
     EnsureChannelFirstd(keys=["image", "mask"]),
     Spacingd(keys=["image", "mask"], pixdim=(1.5, 1.5, 2), mode=("bilinear", "nearest")),
     ConvertToMultiChannelHNTSd(keys=["mask"]),
-    RandSpatialCropd(keys=["image", "mask"], roi_size=[128, 128, 64], random_size=False),  # Random crop
-    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=0),  # Flip along x-axis
-    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=1),  # Flip along y-axis
-    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=2),  # Flip along z-axis
-    NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),  # Normalize nonzero values
-    RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),  # Randomly scale intensity
-    RandShiftIntensityd(keys="image", offsets=0.1, prob=1.0),  # Randomly shift intensity
+    RandSpatialCropd(keys=["image", "mask"], roi_size=[128, 128, 64], random_size=False),
+    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=0),
+    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=1),
+    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=2),
+    NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
+    RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
+    RandShiftIntensityd(keys="image", offsets=0.1, prob=1.0),
     ToTensord(keys=["image", "mask"])
 ])
 
@@ -111,7 +111,7 @@ val_test_transforms = Compose([
     EnsureChannelFirstd(keys=["image", "mask"]),
     Spacingd(keys=["image", "mask"], pixdim=(1.5, 1.5, 2), mode=("bilinear", "nearest")),
     ConvertToMultiChannelHNTSd(keys=["mask"]),
-    NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),  # Normalize nonzero values
+    NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
     ToTensord(keys=["image", "mask"])
 ])
 
@@ -128,12 +128,13 @@ preRT_val_ds = Dataset(data=preRT_val_files, transform=val_test_transforms)
 preRT_test_ds = Dataset(data=preRT_test_files, transform=val_test_transforms)
 #midRT_test_ds = Dataset(data=midRT_test_files, transform=val_test_transforms)
 
-# TODO: maybe change the batch size
-preRT_train_loader = DataLoader(preRT_train_ds, batch_size = 4)
+preRT_train_loader = DataLoader(preRT_train_ds, batch_size=4, collate_fn=pad_list_data_collate, num_workers=4)
+preRT_val_loader = DataLoader(preRT_val_ds, batch_size=4, collate_fn=pad_list_data_collate, num_workers=4)
+preRT_test_loader = DataLoader(preRT_test_ds, batch_size=4, collate_fn=pad_list_data_collate, num_workers=4)
+
+
 #midRT_train_loader = DataLoader(midRT_train_ds, batch_size = 32)
-preRT_val_loader = DataLoader(preRT_val_ds, batch_size = 4)
 #midRT_val_loader = DataLoader(midRT_val_ds, batch_size = 32)
-preRT_test_loader = DataLoader(preRT_test_ds, batch_size = 4)
 #midRT_test_loader = DataLoader(midRT_test_ds, batch_size = 32)
 
 
