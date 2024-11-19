@@ -35,44 +35,8 @@ test_dir = "/cluster/projects/vc/data/mic/open/HNTS-MRG/test"
 
 
 """
-preRT image data loading
+Define a transform to convert the multi-classes labels into multi-labels segmentation task in One-Hot format
 """
-
-preRT_train_images = sorted(glob(os.path.join(train_dir, '*', 'preRT', '*_T2.nii.gz')))
-preRT_train_masks = sorted(glob(os.path.join(train_dir, "*", "preRT", "*_mask.nii.gz")))
-
-preRT_test_images = sorted(glob(os.path.join(test_dir, '*', 'preRT', '*_T2.nii.gz')))
-preRT_test_masks = sorted(glob(os.path.join(test_dir, "*", "preRT", "*_mask.nii.gz")))
-
-X_preRT_train, X_preRT_val, y_preRT_train, y_preRT_val = train_test_split(preRT_train_images, preRT_train_masks, test_size=0.1, random_state=42)
-
-preRT_train_files = [{"image": preRT_image_filename, "mask": preRT_mask_filename} for preRT_image_filename, preRT_mask_filename in zip(X_preRT_train, y_preRT_train)]
-preRT_val_files = [{"image": preRT_image_filename, "mask": preRT_mask_filename} for preRT_image_filename, preRT_mask_filename in zip(X_preRT_val, y_preRT_val)]
-preRT_test_files = [{"image": preRT_image_filename, "mask": preRT_mask_filename} for preRT_image_filename, preRT_mask_filename in zip(preRT_test_images, preRT_test_masks)]
-
-
-"""
-midRT image data loading
-TODO: kopier fra det over
-"""
-
-"""
-midRT_images = sorted(glob(os.path.join(data_dir, "*", "midRT", "*_T2.nii.gz")))
-midRT_masks = sorted(glob(os.path.join(data_dir, "*", "midRT", "*_mask.nii.gz")))
-
-X_midRT_train, X_midRT_test_and_val, y_midRT_train, y_midRT_test_and_val = train_test_split(midRT_images, midRT_masks, test_size=0.4, random_state=42)
-X_midRT_test, X_midRT_val, y_midRT_test, y_midRT_val = train_test_split(X_midRT_test_and_val, y_midRT_test_and_val, test_size=0.5, random_state=42)
-
-midRT_train_files = [{"image": midRT_image_filename, "mask": midRT_mask_filename} for midRT_image_filename, midRT_mask_filename in zip(X_midRT_train, y_midRT_train)]
-midRT_val_files = [{"image": midRT_image_filename, "mask": midRT_mask_filename} for midRT_image_filename, midRT_mask_filename in zip(X_midRT_val, y_midRT_val)]
-midRT_test_files = [{"image": midRT_image_filename, "mask": midRT_mask_filename} for midRT_image_filename, midRT_mask_filename in zip(X_midRT_test, y_midRT_test)]
-"""
-
-"""
-Define a new transform to convert labels
-Here we convert the multi-classes labels into multi-labels segmentation task in One-Hot format.
-"""
-
 class ConvertToMultiChannelHNTSd(MapTransform):
     """
     Convert HNTS-MRG labels to multi-channel format:
@@ -91,28 +55,26 @@ class ConvertToMultiChannelHNTSd(MapTransform):
             d[key] = torch.stack(result, axis=0).float()
         return d
 
+
 """
 Define tranformations
 """
-
 train_transforms = Compose([
     LoadImaged(keys=["image", "mask"]),
     EnsureChannelFirstd(keys=["image"]),
     EnsureTyped(keys=["image", "mask"]),
     ConvertToMultiChannelHNTSd(keys=["mask"]),
     Orientationd(keys=["image", "mask"], axcodes="LPS"),
-    Spacingd(keys=["image", "mask"], pixdim=(0.5, 0.5, 2.0), mode=("bilinear", "nearest")), # TODO: maybe test pixdim=(1.0, 1.0, 1.0) to resample, pixdim=(0.5, 0.5, 2.0) keeps original spacing
-    ResizeWithPadOrCropd(keys=["image", "mask"], spatial_size=(512, 512, 128)),
-    RandSpatialCropd(keys=["image", "mask"], roi_size=[128, 128, 64], random_size=False),
-    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=0),
-    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=1),
-    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=2),
-    NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
-    RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
+    Spacingd(keys=["image", "mask"], pixdim=(0.5, 0.5, 2.0), mode=("bilinear", "nearest")),  # keep original sampling
+    ResizeWithPadOrCropd(keys=["image", "mask"], spatial_size=(512, 512, 64)), 
+    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=0), 
+    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=1), 
+    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=2), 
+    NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True), 
+    RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),  
     RandShiftIntensityd(keys="image", offsets=0.1, prob=1.0),
     ToTensord(keys=["image", "mask"])
 ])
-
 
 val_test_transforms = Compose([
     LoadImaged(keys=["image", "mask"]),
@@ -120,38 +82,49 @@ val_test_transforms = Compose([
     EnsureTyped(keys=["image", "mask"]),
     ConvertToMultiChannelHNTSd(keys=["mask"]),
     Orientationd(keys=["image", "mask"], axcodes="LPS"),
-    Spacingd(keys=["image", "mask"], pixdim=(0.5, 0.5, 2.0), mode=("bilinear", "nearest")),
-    NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
+    Spacingd(keys=["image", "mask"], pixdim=(0.5, 0.5, 2.0), mode=("bilinear", "nearest")), 
+    ResizeWithPadOrCropd(keys=["image", "mask"], spatial_size=(512, 512, 64)), 
+    NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),  
     ToTensord(keys=["image", "mask"])
 ])
 
 
-
 """
-Create datasets and dataloaders
+Get the appropriate dataloaders based on the specified time.
+The time param can only be either "mid" or "pre".
 """
 
-preRT_train_ds = Dataset(data=preRT_train_files, transform=train_transforms)
-#midRT_train_ds = Dataset(data=midRT_train_files, transform=train_transforms)
-preRT_val_ds = Dataset(data=preRT_val_files, transform=val_test_transforms)
-#midRT_val_ds = Dataset(data=midRT_val_files, transform=val_test_transforms)
-preRT_test_ds = Dataset(data=preRT_test_files, transform=val_test_transforms)
-#midRT_test_ds = Dataset(data=midRT_test_files, transform=val_test_transforms)
+def get_dataloaders(time, val_size=0.1, batch_size=4):
 
-preRT_train_loader = DataLoader(preRT_train_ds, batch_size=4, collate_fn=pad_list_data_collate)
-preRT_val_loader = DataLoader(preRT_val_ds, batch_size=4, collate_fn=pad_list_data_collate)
-preRT_test_loader = DataLoader(preRT_test_ds, batch_size=4, collate_fn=pad_list_data_collate)
+    if time not in {"mid", "pre"}:
+        raise ValueError("Invalid time. Expected 'mid' or 'pre'.")
 
+    foldername = str(time) + "RT"
+    train_images = sorted(glob(os.path.join(train_dir, "*", foldername, "*_T2.nii.gz")))
+    train_masks = sorted(glob(os.path.join(train_dir, "*", foldername, "*_mask.nii.gz")))
 
-#midRT_train_loader = DataLoader(midRT_train_ds, batch_size = 32)
-#midRT_val_loader = DataLoader(midRT_val_ds, batch_size = 32)
-#midRT_test_loader = DataLoader(midRT_test_ds, batch_size = 32)
+    test_images = sorted(glob(os.path.join(test_dir, "*", foldername, "*_T2.nii.gz")))
+    test_masks = sorted(glob(os.path.join(test_dir, "*", foldername, "*_mask.nii.gz")))
 
+    X_train, X_val, y_train, y_val = train_test_split(train_images, train_masks, test_size=val_size, random_state=42)
+
+    train_files = [{"image": image_filename, "mask": mask_filename} for image_filename, mask_filename in zip(X_train, y_train)]
+    val_files = [{"image": image_filename, "mask": mask_filename} for image_filename, mask_filename in zip(X_val, y_val)]
+    test_files = [{"image": image_filename, "mask": mask_filename} for image_filename, mask_filename in zip(test_images, test_masks)]
+
+    train_ds = Dataset(data=train_files, transform=train_transforms)
+    val_ds = Dataset(data=val_files, transform=val_test_transforms)
+    test_ds = Dataset(data=test_files, transform=val_test_transforms)
+
+    train_loader = DataLoader(train_ds, batch_size=batch_size, collate_fn=pad_list_data_collate)
+    val_loader = DataLoader(val_ds, batch_size=batch_size, collate_fn=pad_list_data_collate)
+    test_loader = DataLoader(test_ds, batch_size=batch_size, collate_fn=pad_list_data_collate)
+
+    return train_loader, val_loader, test_loader
 
 
 """
 Plot one slice of the first patient
-
 Can be useful for understanding but not needed for preprocessing
 
 
