@@ -12,6 +12,7 @@ from monai.transforms import (
     Compose, 
     LoadImaged, 
     ToTensord, 
+    EnsureTyped,
     EnsureChannelFirstd, 
     Spacingd, 
     NormalizeIntensityd, 
@@ -19,12 +20,15 @@ from monai.transforms import (
     MapTransform,
     RandSpatialCropd,
     RandShiftIntensityd,
-    RandScaleIntensityd
+    RandScaleIntensityd,
+    Orientationd,
+    ResizeWithPadOrCropd
 )
 from monai.data import Dataset, DataLoader, pad_list_data_collate
 from monai.utils import first
 import matplotlib.pyplot as plt
 import torch
+import nibabel as nib
 
 train_dir = "/cluster/projects/vc/data/mic/open/HNTS-MRG/train"
 test_dir = "/cluster/projects/vc/data/mic/open/HNTS-MRG/test"
@@ -40,7 +44,7 @@ preRT_train_masks = sorted(glob(os.path.join(train_dir, "*", "preRT", "*_mask.ni
 preRT_test_images = sorted(glob(os.path.join(test_dir, '*', 'preRT', '*_T2.nii.gz')))
 preRT_test_masks = sorted(glob(os.path.join(test_dir, "*", "preRT", "*_mask.nii.gz")))
 
-X_preRT_train, X_preRT_val, y_preRT_train, y_preRT_val = train_test_split(preRT_train_images, preRT_train_masks, test_size=0.2, random_state=42)
+X_preRT_train, X_preRT_val, y_preRT_train, y_preRT_val = train_test_split(preRT_train_images, preRT_train_masks, test_size=0.1, random_state=42)
 
 preRT_train_files = [{"image": preRT_image_filename, "mask": preRT_mask_filename} for preRT_image_filename, preRT_mask_filename in zip(X_preRT_train, y_preRT_train)]
 preRT_val_files = [{"image": preRT_image_filename, "mask": preRT_mask_filename} for preRT_image_filename, preRT_mask_filename in zip(X_preRT_val, y_preRT_val)]
@@ -56,7 +60,6 @@ TODO: kopier fra det over
 midRT_images = sorted(glob(os.path.join(data_dir, "*", "midRT", "*_T2.nii.gz")))
 midRT_masks = sorted(glob(os.path.join(data_dir, "*", "midRT", "*_mask.nii.gz")))
 
-# TODO: This is a 60/20/20 split because I only have 5 images downloaded, change to 80/10/10 when running on IDUN by setting the first test_size to 0.2 and not 0.4
 X_midRT_train, X_midRT_test_and_val, y_midRT_train, y_midRT_test_and_val = train_test_split(midRT_images, midRT_masks, test_size=0.4, random_state=42)
 X_midRT_test, X_midRT_val, y_midRT_test, y_midRT_val = train_test_split(X_midRT_test_and_val, y_midRT_test_and_val, test_size=0.5, random_state=42)
 
@@ -94,9 +97,12 @@ Define tranformations
 
 train_transforms = Compose([
     LoadImaged(keys=["image", "mask"]),
-    EnsureChannelFirstd(keys=["image", "mask"]),
-    Spacingd(keys=["image", "mask"], pixdim=(1.5, 1.5, 2), mode=("bilinear", "nearest")),
+    EnsureChannelFirstd(keys=["image"]),
+    EnsureTyped(keys=["image", "mask"]),
     ConvertToMultiChannelHNTSd(keys=["mask"]),
+    Orientationd(keys=["image", "mask"], axcodes="LPS"),
+    Spacingd(keys=["image", "mask"], pixdim=(0.5, 0.5, 2.0), mode=("bilinear", "nearest")), # TODO: maybe test pixdim=(1.0, 1.0, 1.0) to resample, pixdim=(0.5, 0.5, 2.0) keeps original spacing
+    ResizeWithPadOrCropd(keys=["image", "mask"], spatial_size=(512, 512, 128)),
     RandSpatialCropd(keys=["image", "mask"], roi_size=[128, 128, 64], random_size=False),
     RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=0),
     RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=1),
@@ -110,9 +116,11 @@ train_transforms = Compose([
 
 val_test_transforms = Compose([
     LoadImaged(keys=["image", "mask"]),
-    EnsureChannelFirstd(keys=["image", "mask"]),
-    Spacingd(keys=["image", "mask"], pixdim=(1.5, 1.5, 2), mode=("bilinear", "nearest")),
+    EnsureChannelFirstd(keys=["image"]),
+    EnsureTyped(keys=["image", "mask"]),
     ConvertToMultiChannelHNTSd(keys=["mask"]),
+    Orientationd(keys=["image", "mask"], axcodes="LPS"),
+    Spacingd(keys=["image", "mask"], pixdim=(0.5, 0.5, 2.0), mode=("bilinear", "nearest")),
     NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
     ToTensord(keys=["image", "mask"])
 ])
