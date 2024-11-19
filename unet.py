@@ -1,5 +1,4 @@
-# Import necessary components from preprocessing.py
-from preprocessing import preRT_train_loader, preRT_val_loader, preRT_test_loader
+from preprocessing import get_dataloaders
 
 import torch
 import torch.nn as nn
@@ -7,34 +6,35 @@ import torch.optim as optim
 from monai.networks.nets import UNet
 from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
+from monai.transforms import Compose, Activations, AsDiscrete
 
-train_loader = preRT_train_loader
-val_loader = preRT_val_loader
-test_loader = preRT_test_loader
-
-# Define device
+train_loader, val_loader, test_loader = get_dataloaders(time="pre", batch_size=16)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Define the model
+
+"""
+Define the model, loss function and optimizer
+"""
 model = UNet(
     spatial_dims=3,
     in_channels=1,
-    out_channels=3,  # background and two tumor labels
+    out_channels=3,
     channels=(16, 32, 64, 128, 256),
     strides=(2, 2, 2, 2),
     kernel_size=3,
     up_kernel_size=3
 ).to(device)
 
-# Define the loss function and optimizer
-loss_function = loss_function = DiceLoss(to_onehot_y=False, softmax=True)
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
+loss_function = DiceLoss(to_onehot_y=False, sigmoid=True) 
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+dice_metric = DiceMetric(include_background=True, reduction="mean_batch")
+post_trans = Compose([Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
 
-# Metrics
-dice_metric = DiceMetric(include_background=True, reduction="mean")
 
-# Training and validation loop
-epochs = 20
+"""
+Training and validation loop
+"""
+epochs = 50
 best_metric = -1
 best_metric_epoch = -1
 val_interval = 1
@@ -45,7 +45,7 @@ for epoch in range(epochs):
     epoch_loss = 0
     step = 0
     
-    for batch_data in preRT_train_loader:
+    for batch_data in train_loader:
         step += 1
         inputs, masks = batch_data["image"].to(device), batch_data["mask"].to(device)
         optimizer.zero_grad()
@@ -63,16 +63,15 @@ for epoch in range(epochs):
     if (epoch + 1) % val_interval == 0:
         model.eval()
         with torch.no_grad():
-            val_dice = []
-            for val_data in preRT_val_loader:
+            for val_data in val_loader:
                 val_inputs, val_masks = val_data["image"].to(device), val_data["mask"].to(device)
                 val_outputs = model(val_inputs)
-                val_outputs = torch.sigmoid(val_outputs)  # Sigmoid activation for binary segmentation
-                dice = dice_metric(y_pred=val_outputs, y=val_masks)
-                val_dice.append(dice.item())
+                val_outputs = post_trans(val_outputs)  
+                dice_metric(y_pred=val_outputs, y=val_masks)
 
-            mean_dice = torch.tensor(val_dice).mean().item()
+            mean_dice = dice_metric.aggregate().mean().item()
             print(f"Validation Dice: {mean_dice:.4f}")
+            dice_metric.reset()
 
             if mean_dice > best_metric:
                 best_metric = mean_dice
@@ -82,18 +81,20 @@ for epoch in range(epochs):
 
 print(f"Training Complete. Best Metric: {best_metric:.4f} at Epoch: {best_metric_epoch}")
 
-# Testing the model
+
+"""
+Testing the model
+"""
 print("Testing the model...")
 model.load_state_dict(torch.load("best_model.pth"))
 model.eval()
 with torch.no_grad():
-    test_dice = []
     for test_data in test_loader:
         test_inputs, test_masks = test_data["image"].to(device), test_data["mask"].to(device)
         test_outputs = model(test_inputs)
-        test_outputs = torch.sigmoid(test_outputs)  # Sigmoid activation for binary segmentation
-        dice = dice_metric(y_pred=test_outputs, y=test_masks)
-        test_dice.append(dice.item())
+        test_outputs = post_trans(test_outputs)  
+        dice_metric(y_pred=test_outputs, y=test_masks)  
 
-    mean_test_dice = torch.tensor(test_dice).mean().item()
+    mean_test_dice = dice_metric.aggregate().mean().item()
     print(f"Test Dice: {mean_test_dice:.4f}")
+    dice_metric.reset()  
