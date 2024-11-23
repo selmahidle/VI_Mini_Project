@@ -13,74 +13,39 @@ from monai.transforms import (
     RandShiftIntensityd,
     RandScaleIntensityd,
     Orientationd,
-    ResizeWithPadOrCropd
+    ResizeWithPadOrCropd,
+    MapTransform,
+    RandSpatialCropd,
 )
-from monai.data import Dataset, DataLoader
+from monai.data import CacheDataset, DataLoader
 import torch
 
 train_dir = "/cluster/projects/vc/data/mic/open/HNTS-MRG/train"
 test_dir = "/cluster/projects/vc/data/mic/open/HNTS-MRG/test"
-
-""" 
-Define transformations
-"""
 
 train_transforms = Compose([
     LoadImaged(keys=["image", "mask"]),
     EnsureChannelFirstd(keys=["image", "mask"]),
     EnsureTyped(keys=["image", "mask"]),
     Orientationd(keys=["image", "mask"], axcodes="LPS"),
-    Spacingd(
-        keys=["image", "mask"], 
-        pixdim=(0.5, 0.5, 2.0), 
-        mode=("bilinear", "nearest")
-    ),
-    ResizeWithPadOrCropd(
-        keys=["image", "mask"], 
-        spatial_size=(512, 512, 64)
-    ), 
-    RandFlipd(
-        keys=["image", "mask"], 
-        prob=0.5, 
-        spatial_axis=[0, 1, 2]
-    ), 
-    RandScaleIntensityd(
-        keys="image", 
-        factors=0.1, 
-        prob=0.5
-    ),
-    RandShiftIntensityd(
-        keys="image", 
-        offsets=0.1, 
-        prob=0.5
-    ),
-    NormalizeIntensityd(
-        keys="image", 
-        nonzero=True, 
-        channel_wise=True
-    ),
+    Spacingd(keys=["image", "mask"], pixdim=(0.5, 0.5, 2.0), mode=("bilinear", "nearest")),  # keep original sampling
+    ResizeWithPadOrCropd(keys=["image", "mask"], spatial_size=(512, 512, 64)), 
+    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=0), 
+    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=1), 
+    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=2), 
+    NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True), 
+    RandScaleIntensityd(keys="image", factors=0.1, prob=0.5),  
+    RandShiftIntensityd(keys="image", offsets=0.1, prob=0.5),
     ToTensord(keys=["image", "mask"])
 ])
-
 val_test_transforms = Compose([
     LoadImaged(keys=["image", "mask"]),
     EnsureChannelFirstd(keys=["image", "mask"]),
     EnsureTyped(keys=["image", "mask"]),
     Orientationd(keys=["image", "mask"], axcodes="LPS"),
-    Spacingd(
-        keys=["image", "mask"], 
-        pixdim=(0.5, 0.5, 2.0), 
-        mode=("bilinear", "nearest")
-    ),
-    ResizeWithPadOrCropd(
-        keys=["image", "mask"], 
-        spatial_size=(512, 512, 64)
-    ), 
-    NormalizeIntensityd(
-        keys="image", 
-        nonzero=True, 
-        channel_wise=True
-    ),
+    Spacingd(keys=["image", "mask"], pixdim=(0.5, 0.5, 2.0), mode=("bilinear", "nearest")), 
+    ResizeWithPadOrCropd(keys=["image", "mask"], spatial_size=(512, 512, 64)), 
+    NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),  
     ToTensord(keys=["image", "mask"])
 ])
 
@@ -92,6 +57,7 @@ Function to get dataloaders
 def get_dataloaders(time, val_size=0.1, batch_size=4):
     if time not in {"mid", "pre"}:
         raise ValueError("Invalid time. Expected 'mid' or 'pre'.")
+    
     foldername = f"{time}RT"
     train_images = sorted(glob(os.path.join(train_dir, "*", foldername, "*_T2.nii.gz")))
     train_masks = sorted(glob(os.path.join(train_dir, "*", foldername, "*_mask.nii.gz")))
@@ -110,9 +76,9 @@ def get_dataloaders(time, val_size=0.1, batch_size=4):
     val_files = [{"image": img, "mask": msk} for img, msk in zip(X_val, y_val)]
     test_files = [{"image": img, "mask": msk} for img, msk in zip(test_images, test_masks)]
 
-    train_ds = Dataset(data=train_files, transform=train_transforms)
-    val_ds = Dataset(data=val_files, transform=val_test_transforms)
-    test_ds = Dataset(data=test_files, transform=val_test_transforms)
+    train_ds = CacheDataset(data=train_files, transform=train_transforms, cache_rate=1.0)
+    val_ds = CacheDataset(data=val_files, transform=val_test_transforms, cache_rate=1.0)
+    test_ds = CacheDataset(data=test_files, transform=val_test_transforms, cache_rate=1.0)
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=batch_size)
