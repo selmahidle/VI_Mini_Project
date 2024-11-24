@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from monai.networks.nets import UNet
-from monai.losses import DiceLoss
+from monai.losses import DiceCELoss
 from monai.metrics import DiceMetric
 from monai.transforms import Compose, Activations, AsDiscrete, EnsureType
 import matplotlib.pyplot as plt
@@ -32,15 +32,15 @@ model = UNet(
 ).to(device)
 
 
-max_epochs = 2
+max_epochs = 1
 best_metric = -1
 best_metric_epoch = -1
 val_interval = 1
 
-loss_function = DiceLoss(include_background=False,to_onehot_y=True, softmax=True) 
+loss_function = DiceCELoss(include_background=False,to_onehot_y=True, softmax=True) 
 optimizer = optim.Adam(model.parameters(), lr=0.001)
-dice_metric = DiceMetric(include_background=False, reduction="none")
-dice_metric_batch = DiceMetric(include_background=False, reduction="none")
+dice_metric = DiceMetric(include_background=False, reduction="mean")
+dice_metric_batch = DiceMetric(include_background=False, reduction="mean_batch")
 lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
 
 epoch_loss_values = []
@@ -82,11 +82,28 @@ for epoch in range(max_epochs):
                 val_outputs = torch.argmax(val_outputs, dim=1, keepdim=True)
                 dice_metric(y_pred=val_outputs, y=val_masks)
                 dice_metric_batch(y_pred=val_outputs, y=val_masks)
+                print("y_pred:")
+                print(f"Type: {type(y_pred)}")
+                print(f"Shape: {y_pred.shape}")
+                print(f"Values:\n{y_pred}")
 
-            mean_dice = dice_metric.aggregate().mean().item()
+                print("y:")
+                print(f"Type: {type(y)}")
+                print(f"Shape: {y.shape}")
+                print(f"Values:\n{y}")
+
+            mean_dice = dice_metric.aggregate().item()
             metric_batch = dice_metric_batch.aggregate()
 
-            metric_class1 = metric_batch[1].item()  # GTVp
+            try:
+                metric_class1 = metric_batch[1].item()  # GTVp
+                print(f"metric_class1: {metric_class1}")
+            except Exception as e:
+                print(f"Error calculating metric_class1: {e}")
+                print(f"metric_batch: {metric_batch}")
+                print(f"Type: {type(metric_batch)}, Shape: {metric_batch.shape}, Values: {metric_batch}")
+
+            # metric_class1 = metric_batch[1].item()  # GTVp
             metric_class2 = metric_batch[2].item()  # GTVn
 
             metric_values.append(mean_dice)
@@ -104,7 +121,7 @@ for epoch in range(max_epochs):
             if mean_dice > best_metric:
                 best_metric = mean_dice
                 best_metric_epoch = epoch + 1
-                torch.save(model.state_dict(), "best_unet_wo_background_model.pth")
+                torch.save(model.state_dict(), "best_unet_model.pth")
                 print("Saved Best Model")
 
 print(f"Training Complete. Best Metric: {best_metric:.4f} at Epoch: {best_metric_epoch}")
@@ -121,7 +138,7 @@ metric_values_class1 = []  # For GTVp
 metric_values_class2 = []  # For GTVn
 
 print("Testing the model...")
-model.load_state_dict(torch.load("best_unet_wo_background_model.pth"))
+model.load_state_dict(torch.load("best_unet_model.pth"))
 model.eval()
 with torch.no_grad():
     for test_data in test_loader:
@@ -169,7 +186,7 @@ plt.plot(x, y, color="green", label="Val Dice")
 plt.legend()
 plt.show()
 plt.savefig('unet_results_1.png')
-print("Plot saved as unet_wo_background_results_1.png")
+print("Plot saved as unet_results_1.png")
 
 plt.figure("class_metrics", (12, 6))
 plt.subplot(1, 2, 1)
@@ -191,5 +208,5 @@ plt.plot(x, y, color="brown", label="GTVn Dice")
 plt.legend()
 
 plt.show()
-plt.savefig('unet_wo_background_results_2.png')
+plt.savefig('unet_results_2.png')
 print("Plot saved as unet_results_2.png")
