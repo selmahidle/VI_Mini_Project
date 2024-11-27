@@ -16,6 +16,7 @@ from monai.transforms import (
     ResizeWithPadOrCropd,
     MapTransform,
     RandSpatialCropd,
+    CastToTyped
 )
 from monai.data import CacheDataset, DataLoader
 import torch
@@ -23,20 +24,23 @@ import torch
 train_dir = "/cluster/projects/vc/data/mic/open/HNTS-MRG/train"
 test_dir = "/cluster/projects/vc/data/mic/open/HNTS-MRG/test"
 
+
 train_transforms = Compose([
     LoadImaged(keys=["image", "mask"]),
     EnsureChannelFirstd(keys=["image", "mask"]),
     EnsureTyped(keys=["image", "mask"]),
     Orientationd(keys=["image", "mask"], axcodes="LPS"),
     Spacingd(keys=["image", "mask"], pixdim=(0.5, 0.5, 2.0), mode=("bilinear", "nearest")),  # keep original sampling
-    ResizeWithPadOrCropd(keys=["image", "mask"], spatial_size=(512, 512, 64)), 
+    ResizeWithPadOrCropd(keys=["image", "mask"], spatial_size=(256, 256, 32)), 
     RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=0), 
     RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=1), 
-    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=2), 
+    RandFlipd(keys=["image", "mask"], prob=0.5, spatial_axis=2),
     NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True), 
     RandScaleIntensityd(keys="image", factors=0.1, prob=0.5),  
     RandShiftIntensityd(keys="image", offsets=0.1, prob=0.5),
-    ToTensord(keys=["image", "mask"])
+    ToTensord(keys=["image", "mask"]),
+    #added 25 nov in the night
+    CastToTyped(keys=["mask"], dtype=torch.long),
 ])
 val_test_transforms = Compose([
     LoadImaged(keys=["image", "mask"]),
@@ -44,9 +48,11 @@ val_test_transforms = Compose([
     EnsureTyped(keys=["image", "mask"]),
     Orientationd(keys=["image", "mask"], axcodes="LPS"),
     Spacingd(keys=["image", "mask"], pixdim=(0.5, 0.5, 2.0), mode=("bilinear", "nearest")), 
-    ResizeWithPadOrCropd(keys=["image", "mask"], spatial_size=(512, 512, 64)), 
+    ResizeWithPadOrCropd(keys=["image", "mask"], spatial_size=(256, 256, 32)), 
     NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),  
-    ToTensord(keys=["image", "mask"])
+    ToTensord(keys=["image", "mask"]),
+    #added 25 nov in the night
+    CastToTyped(keys=["mask"], dtype=torch.long),
 ])
 
 
